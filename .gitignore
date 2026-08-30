@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.egg-info/
+
+# Server runtime state (databases, downloaded models, secrets)
+server/.env
+server/data/
+server/models/
+server/reply.wav
+
+# Firmware build output and local credentials
+firmware/.pio/
+firmware/include/secrets.h
+*.bin
+
+# 3D slicer output
+*.gcode
+*.3mf
+
+# OS noise
+.DS_Store
+Thumbs.db
