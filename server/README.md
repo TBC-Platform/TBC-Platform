@@ -91,11 +91,12 @@ line rather than crashing.
 
 ```bash
 pip install -r requirements-dev.txt
-python3 -m pytest -q          # 148 tests, no hardware, no network
+python3 -m pytest -q          # 156 tests, no hardware, no network
 python3 -m ruff check .
 ```
 
 Coverage is concentrated where mistakes are expensive: the wire format
-(including a test that parses the C header and fails if firmware and server
-drift apart), the smart home allowlist, and the full session pipeline driven
+(the C header is both parsed for constant drift *and* compiled with `g++
+-Werror` so the real C encoder and decoder are checked against the Python ones
+byte for byte), the smart home allowlist, and the full session pipeline driven
 end to end with fake engines.

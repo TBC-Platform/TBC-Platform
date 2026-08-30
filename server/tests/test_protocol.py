@@ -10,13 +10,17 @@ otherwise show up as garbled audio on real hardware.
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from walle import protocol as proto
 
-HEADER = Path(__file__).resolve().parents[2] / "firmware" / "src" / "core" / "protocol.h"
+FIRMWARE = Path(__file__).resolve().parents[2] / "firmware"
+HEADER = FIRMWARE / "src" / "core" / "protocol.h"
+HOST_HARNESS = FIRMWARE / "test" / "test_protocol_host.cpp"
 
 
 def _c_defines() -> dict[str, str]:
@@ -131,3 +135,92 @@ def test_chunk_audio_drops_odd_trailing_byte():
     """An odd byte would shift every following sample and produce static."""
     chunks = proto.chunk_audio(bytes(101))
     assert sum(len(c) for c in chunks) == 100
+
+
+# ---------------------------------------------------------------------------
+# The C half of the protocol, compiled and run for real.
+#
+# Comparing #define values catches drift in the constants but not in the code
+# around them. protocol.h is plain C++ with no Arduino dependency, so it builds
+# on the host - which lets us check the actual encoder and decoder against the
+# Python ones byte for byte, and (with -Werror) that the header is
+# self-contained. A firmware build needs an Xtensa toolchain; this needs g++.
+# ---------------------------------------------------------------------------
+
+requires_cxx = pytest.mark.skipif(
+    shutil.which("g++") is None or not HOST_HARNESS.is_file(),
+    reason="g++ or the host harness is unavailable",
+)
+
+
+@pytest.fixture(scope="module")
+def host_harness(tmp_path_factory):
+    """Compiles firmware/test/test_protocol_host.cpp and returns its path.
+
+    -Werror is the point, not politeness: `#include "core/protocol.h"` comes
+    first in that file, so a header that leans on Arduino.h for size_t fails
+    here instead of two thirds of the way through a firmware build.
+    """
+    if shutil.which("g++") is None or not HOST_HARNESS.is_file():
+        pytest.skip("g++ or the host harness is unavailable")
+    binary = tmp_path_factory.mktemp("proto") / "proto_host"
+    result = subprocess.run(
+        ["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror",
+         "-I", str(FIRMWARE / "src"), "-o", str(binary), str(HOST_HARNESS)],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        pytest.fail(f"protocol.h does not compile cleanly:\n{result.stderr}")
+    return binary
+
+
+def run_harness(binary, *args: str) -> str:
+    result = subprocess.run([str(binary), *args], capture_output=True, text=True, check=True)
+    return result.stdout.strip()
+
+
+@requires_cxx
+def test_c_header_compiles_standalone_without_warnings(host_harness):
+    """The fixture failing is the test; reaching here means it built clean."""
+    assert host_harness.exists()
+
+
+@requires_cxx
+@pytest.mark.parametrize("btype,flags,seq,payload", [
+    (proto.BinType.AUDIO_DOWN, proto.FLAG_NONE, 0, b""),
+    (proto.BinType.AUDIO_DOWN, proto.FLAG_FIRST, 1, b"\xde\xad\xbe\xef"),
+    (proto.BinType.AUDIO_UP, proto.FLAG_LAST, 4660, bytes(proto.AUDIO_FRAME_BYTES)),
+    (proto.BinType.JPEG_UP, proto.FLAG_FIRST | proto.FLAG_LAST, 65535, bytes(4096)),
+])
+def test_c_and_python_encoders_agree_byte_for_byte(host_harness, btype, flags, seq, payload):
+    """A mismatch here is garbled audio on real hardware."""
+    c_header = run_harness(host_harness, "emit", str(int(btype)), str(flags),
+                           str(seq), str(len(payload)))
+    python_header = proto.encode_bin(btype, payload, flags=flags, seq=seq)[:proto.BIN_HEADER_LEN]
+    assert c_header == python_header.hex()
+
+
+@requires_cxx
+def test_c_decoder_reads_a_python_encoded_frame(host_harness):
+    frame = proto.encode_bin(proto.BinType.AUDIO_DOWN, b"\xde\xad\xbe\xef",
+                             flags=proto.FLAG_LAST, seq=4660)
+    parsed = run_harness(host_harness, "parse", frame.hex())
+    assert parsed == f"ok {int(proto.BinType.AUDIO_DOWN)} {proto.FLAG_LAST} 4660 4 deadbeef"
+
+
+@requires_cxx
+def test_c_decoder_accepts_an_empty_end_of_stream_frame(host_harness):
+    frame = proto.encode_bin(proto.BinType.AUDIO_DOWN, b"", flags=proto.FLAG_LAST)
+    assert run_harness(host_harness, "parse", frame.hex()).startswith("ok")
+
+
+@requires_cxx
+def test_c_decoder_rejects_what_python_rejects(host_harness):
+    bad_magic = bytearray(proto.encode_bin(proto.BinType.AUDIO_UP, b"abc"))
+    bad_magic[0] = 0x00
+    assert run_harness(host_harness, "parse", bytes(bad_magic).hex()) == "reject"
+
+    truncated = proto.encode_bin(proto.BinType.AUDIO_UP, b"abcdefgh")[:-3]
+    assert run_harness(host_harness, "parse", truncated.hex()) == "reject"
+
+    assert run_harness(host_harness, "parse", "a701") == "reject"

@@ -30,6 +30,10 @@
 // ---------------------------------------------------------------------------
 #pragma once
 
+// Both are needed and neither is optional: size_t comes from <stddef.h>, and a
+// translation unit that includes this header *before* Arduino.h (as vad.cpp
+// does) gets nothing transitively. A header has to stand on its own.
+#include <stddef.h>
 #include <stdint.h>
 
 // Bump only for breaking changes; the server refuses mismatched majors.
@@ -108,5 +112,8 @@ inline bool walleParseBinHeader(const uint8_t *in, size_t inLen,
   *flags = in[2];
   *seq = static_cast<uint16_t>(in[4] | (in[5] << 8));
   *len = static_cast<uint16_t>(in[6] | (in[7] << 8));
-  return (*len + WALLE_BIN_HEADER_LEN) <= inLen;
+  // Cast before adding: *len promotes to int, and comparing that against a
+  // size_t is a signed/unsigned comparison the compiler is right to warn
+  // about. Harmless at these magnitudes, wrong in principle.
+  return (static_cast<size_t>(*len) + WALLE_BIN_HEADER_LEN) <= inLen;
 }

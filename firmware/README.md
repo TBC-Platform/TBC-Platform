@@ -120,6 +120,13 @@ OTA slots. It works; it is just more steps to get wrong.
 ## Protocol
 
 The wire format is defined once in `src/core/protocol.h` and mirrored in
-`server/walle/protocol.py`. `server/tests/test_protocol.py` parses the C header
-and fails if the two ever disagree — worth knowing before you change a constant
-in one of them.
+`server/walle/protocol.py`. `server/tests/test_protocol.py` checks both halves:
+it parses the C header so the constants cannot drift, and it compiles
+`test/test_protocol_host.cpp` with `g++ -Werror` to run the *actual* C encoder
+and decoder against the Python ones byte for byte.
+
+That host build is worth more than it looks. `protocol.h` is plain C++ with no
+Arduino dependency, so it needs no Xtensa toolchain — and because the harness
+includes it first, with warnings as errors, a header that quietly leans on
+`Arduino.h` for `size_t` fails in a two second test instead of two thirds of
+the way through a firmware build.
