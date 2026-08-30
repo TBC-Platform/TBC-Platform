@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: MIT
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  server:
+    name: Server tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        working-directory: server
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Lint
+        working-directory: server
+        run: python -m ruff check .
+      - name: Tests
+        working-directory: server
+        run: python -m pytest -q
+
+  models:
+    name: 3D parts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest
+      # Every part must be watertight and fit a 180 mm bed.
+      - name: Validate parts
+        working-directory: 3d-models
+        run: python -m pytest tools -q
+      # Regenerating must not change the committed STLs.
+      - name: STLs are up to date
+        run: |
+          python3 3d-models/tools/gen_stl.py
+          git diff --exit-code -- 3d-models/stl
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Bill of materials adds up
+        run: python3 docs/check_bom.py
+      - name: Internal links resolve
+        run: python3 docs/check_links.py
+
+  firmware:
+    name: Firmware build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install platformio
+      - name: Provide placeholder credentials
+        working-directory: firmware
+        # secrets.h is git-ignored by design; CI needs a stand-in to compile.
+        run: cp include/secrets.example.h include/secrets.h
+      - name: Build
+        working-directory: firmware
+        run: pio run -e walle
