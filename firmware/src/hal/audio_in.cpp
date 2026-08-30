@@ -79,8 +79,11 @@ bool begin() {
 size_t readFrame(int16_t *out) {
   if (!gReady) return 0;
   size_t bytesRead = 0;
-  const esp_err_t err = i2s_channel_read(gRx, gRaw, sizeof(gRaw), &bytesRead,
-                                         pdMS_TO_TICKS(60));
+  // The final argument is a timeout in MILLISECONDS, not ticks - the ESP-IDF
+  // header is explicit about it. pdMS_TO_TICKS() here happens to give the same
+  // number at the default 1 kHz tick rate and would silently become wrong at
+  // any other. 60 ms is three frames of slack.
+  const esp_err_t err = i2s_channel_read(gRx, gRaw, sizeof(gRaw), &bytesRead, 60);
   if (err != ESP_OK || bytesRead == 0) return 0;
 
   const size_t count = bytesRead / sizeof(int32_t);

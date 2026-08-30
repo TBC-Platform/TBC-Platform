@@ -10,6 +10,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <esp_random.h>
+#include <initializer_list>
 #include <string.h>
 
 namespace {
