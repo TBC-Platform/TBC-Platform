@@ -70,6 +70,8 @@ MSG_HELLO_ACK: Final[str] = "hello_ack"
 MSG_FACE: Final[str] = "face"
 MSG_SAY_BEGIN: Final[str] = "say_begin"
 MSG_SAY_END: Final[str] = "say_end"
+# Ends every turn, speech or not, so the device never waits on a timeout.
+MSG_TURN_END: Final[str] = "turn_end"
 MSG_MOVE: Final[str] = "move"
 MSG_HEAD: Final[str] = "head"
 MSG_CAM: Final[str] = "cam"

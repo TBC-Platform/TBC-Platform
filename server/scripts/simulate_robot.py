@@ -95,6 +95,9 @@ async def run(args: argparse.Namespace) -> int:
                         print(f"  [say]   {msg.get('text')!r}")
                     elif kind == proto.MSG_SAY_END:
                         print("  [say]   finished")
+                    elif kind == proto.MSG_TURN_END:
+                        reason = msg.get("reason")
+                        print(f"  [turn]  finished{f' ({reason})' if reason else ''}")
                         done.set()
                     elif kind == proto.MSG_CAM:
                         print("  [cam]   capture requested")

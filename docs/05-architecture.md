@@ -83,6 +83,7 @@ One WebSocket, two frame types.
 | → device | `hello_ack` | Protocol version, which engines are loaded |
 | → device | `face` | Show an expression |
 | → device | `say_begin` / `say_end` | Speech is starting / finished |
+| → device | `turn_end` | This turn is over. Sent even when nothing was said, so the device never waits on a timeout |
 | → device | `move` / `head` | Drive the tracks / pan the head |
 | → device | `cam` | Capture a still |
 | → device | `ota` | Fetch and flash a firmware image |
@@ -109,8 +110,9 @@ BOOT → CONNECTING → IDLE ⇄ LISTENING → THINKING → SPEAKING
 
 - **IDLE** — wake word running on every frame, face blinking.
 - **LISTENING** — streaming 20 ms frames, VAD watching for the end.
-- **THINKING** — the server owns this; the device times out after 20 s so it can
-  never get stuck.
+- **THINKING** — the server owns this. It ends when speech starts arriving or
+  when `turn_end` says the turn produced none; the 20 s timeout is a
+  backstop for a server that vanished mid-turn, not the normal exit.
 - **SPEAKING** — wake word muted (otherwise the robot hears itself say its own
   name and wakes up in a loop), buffer draining, mouth animating to the audio
   envelope.

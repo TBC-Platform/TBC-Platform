@@ -123,8 +123,15 @@ class WhisperCppStt(SttEngine):
         from array import array
 
         try:
-            await self.transcribe(array("h", bytes(2 * 3200)), 16000)
-            log.info("stt warmed up (%s)", Path(self._model).name)
+            result = await self.transcribe(array("h", bytes(2 * 3200)), 16000)
+            error = result.meta.get("error")
+            if error:
+                # Reporting "warmed up" here would be an outright lie, and it is
+                # the log line someone reads when the robot hears nothing.
+                log.warning("stt is not usable (%s) - check WALLE_WHISPER_BIN "
+                            "and WALLE_WHISPER_MODEL", error)
+            else:
+                log.info("stt warmed up (%s)", Path(self._model).name)
         except Exception:  # pragma: no cover - warmup must never be fatal
             log.warning("stt warmup failed; first request will be slower", exc_info=True)
 

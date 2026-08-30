@@ -267,6 +267,60 @@ async def test_camera_overrun_is_dropped(session, caplog):
 # Capture edge cases
 # ---------------------------------------------------------------------------
 
+async def test_every_turn_ends_with_turn_end(session, wire):
+    """The device leaves THINKING on turn_end, so it must always arrive."""
+    await speak_to(session, "what is the capital of france")
+    assert wire.types()[-1] == proto.MSG_TURN_END
+
+
+async def test_turn_end_is_sent_even_when_nothing_was_understood(session, wire):
+    """Otherwise the robot sits in THINKING for 20 s after every misheard word."""
+    await speak_to(session, "Thank you.")  # a Whisper silence hallucination
+    assert proto.MSG_SAY_BEGIN not in wire.types()
+    assert wire.types()[-1] == proto.MSG_TURN_END
+
+
+async def test_turn_end_is_sent_when_an_engine_fails(session, wire):
+    async def broken(_samples, _rate):
+        raise RuntimeError("recogniser exploded")
+
+    session.brain.stt.transcribe = broken
+    await speak_to(session, "anything")
+    assert wire.types()[-1] == proto.MSG_TURN_END
+    assert wire.first(proto.MSG_ERROR) is not None
+
+
+async def test_turn_end_carries_a_reason_for_skipped_utterances(session, wire):
+    await speak_to(session, "unused", speech=False)
+    turn_end = wire.first(proto.MSG_TURN_END)
+    assert turn_end["reason"] == "no-speech"
+
+
+async def test_barge_in_does_not_send_turn_end(session, wire, brain):
+    """A cancelled turn must not tell the device to go idle - it is listening."""
+    import asyncio as _asyncio
+
+    async def slow(_messages):
+        await _asyncio.sleep(5)
+        raise AssertionError("should have been cancelled")
+
+    brain.llm.chat = slow
+    session.brain.stt.text = "tell me a long story"
+    await session.on_control({"t": proto.MSG_UTT_BEGIN})
+    pcm = array("h", bytes(proto.AUDIO_SAMPLE_RATE * 2)).tobytes()
+    for chunk in proto.chunk_audio(pcm):
+        await session.on_binary(proto.encode_bin(proto.BinType.AUDIO_UP, chunk))
+    await session.on_control({"t": proto.MSG_UTT_END, "ms": 1000, "speech": True})
+
+    first_turn = session._speaking_task
+    await _asyncio.sleep(0.05)               # let the turn reach the LLM
+    await session.on_control({"t": proto.MSG_UTT_BEGIN})  # user interrupts
+    with pytest.raises(_asyncio.CancelledError):
+        await first_turn
+
+    assert proto.MSG_TURN_END not in wire.types()
+
+
 async def test_no_speech_flag_skips_the_whole_pipeline(session, brain, wire):
     """A false wake must not cost a Whisper run."""
     await speak_to(session, "should not be used", speech=False)

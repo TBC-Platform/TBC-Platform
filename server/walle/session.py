@@ -239,11 +239,13 @@ class Session:
             # pipeline - this saves a pointless Whisper run on every false wake.
             log.info("[%s] utterance had no speech, ignoring", self.device_id)
             await self.set_face("idle")
+            await self.send(proto.MSG_TURN_END, reason="no-speech")
             return
 
         if len(samples) < proto.AUDIO_SAMPLE_RATE // 4:  # < 250 ms
             log.info("[%s] utterance too short (%d samples)", self.device_id, len(samples))
             await self.set_face("idle")
+            await self.send(proto.MSG_TURN_END, reason="too-short")
             return
 
         timings = TurnTimings(capture=int((time.monotonic() - self._utt_started) * 1000))
@@ -255,6 +257,8 @@ class Session:
             async with self._turn_lock:
                 await self._process(samples, timings, started)
         except asyncio.CancelledError:
+            # Barge-in: a new turn is already starting, so do NOT send turn_end -
+            # the device has moved on to LISTENING and would only be confused.
             log.info("[%s] turn cancelled (barge-in)", self.device_id)
             raise
         except Exception:
@@ -262,6 +266,12 @@ class Session:
             await self.send(proto.MSG_ERROR, msg="internal error")
             await self.set_face("confused", 1500)
             await self._say("Sorry, something went wrong in my head.")
+
+        # Reached on success and on a handled error, but never after a
+        # barge-in, because that path re-raises. Closing every turn out
+        # explicitly is what stops the device waiting on its 20 s timeout when
+        # a turn produced no speech at all.
+        await self.send(proto.MSG_TURN_END)
 
     # ------------------------------------------------------------------
     # The pipeline
@@ -279,7 +289,7 @@ class Session:
                      self.device_id, duration_ms(samples) / 1000)
             await self.set_face("confused", 1200)
             await self.set_face("idle")
-            return
+            return  # _run_turn's finally clause sends turn_end
 
         log.info("[%s] heard: %r", self.device_id, transcript.text)
 

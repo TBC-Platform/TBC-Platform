@@ -49,6 +49,7 @@ def test_message_names_match_firmware():
         ("MSG_FACE", proto.MSG_FACE),
         ("MSG_SAY_BEGIN", proto.MSG_SAY_BEGIN),
         ("MSG_SAY_END", proto.MSG_SAY_END),
+        ("MSG_TURN_END", proto.MSG_TURN_END),
         ("MSG_MOVE", proto.MSG_MOVE),
         ("MSG_HEAD", proto.MSG_HEAD),
         ("MSG_CAM", proto.MSG_CAM),

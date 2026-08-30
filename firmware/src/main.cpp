@@ -190,6 +190,15 @@ void handleControl(const char *type, JsonObjectConst msg) {
   } else if (!strcmp(type, MSG_SAY_END)) {
     gServerSaidDone = true;
 
+  } else if (!strcmp(type, MSG_TURN_END)) {
+    // The server is finished with this turn. If it never sent any speech - it
+    // heard nothing intelligible, or an engine failed - this is what gets us
+    // out of THINKING immediately instead of waiting for the 20 s timeout.
+    if (gState == ST_THINKING) {
+      gServerSaidDone = true;
+      setState(ST_IDLE);
+    }
+
   } else if (!strcmp(type, MSG_MOVE)) {
     const MoveCmd cmd = motors::cmdFromName(msg["cmd"] | "stop");
     motors::move(cmd, msg["speed"] | 60, msg["ms"] | 0);

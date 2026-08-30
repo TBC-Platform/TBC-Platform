@@ -74,6 +74,11 @@ enum WalleBinType : uint8_t {
 #define MSG_FACE "face"
 #define MSG_SAY_BEGIN "say_begin"
 #define MSG_SAY_END "say_end"
+// Sent at the end of EVERY turn, including turns that produce no speech
+// (nothing intelligible was heard, an engine failed). Without it the device
+// would sit in THINKING until its 20 s timeout after every misheard
+// utterance, which is 20 s of being unable to wake the robot.
+#define MSG_TURN_END "turn_end"
 #define MSG_MOVE "move"
 #define MSG_HEAD "head"
 #define MSG_CAM "cam"
