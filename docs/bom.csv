@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: MIT
+# Wall-E desk robot - bill of materials. Prices are indicative USD, early 2026.
+# group: core = required; motion/power/passives/hardware/filament = see docs/01-parts-list.md
+item,group,part,qty,unit_price_usd,total_usd,required,notes
+1,core,Freenove ESP32-S3-WROOM CAM board (8MB PSRAM + OV2640),1,16.00,16.00,yes,Default pin map in firmware/include/config.h targets this board
+2,core,INMP441 I2S MEMS microphone module,1,3.50,3.50,yes,Digital mic keeps servo noise out of the audio
+3,core,MAX98357A I2S class-D amplifier,1,4.50,4.50,yes,Amplifier and DAC in one
+4,core,Speaker 4 ohm 3 W 40 mm,1,3.00,3.00,yes,4-8 ohm fits the printed grille
+5,core,SSD1306 OLED 0.96in 128x64 I2C,1,4.00,4.00,yes,head_shell.stl window is cut for this module
+6,core,USB cable for flashing,1,2.00,2.00,yes,
+7,motion,FS90R continuous-rotation micro servo,2,5.00,10.00,no,Continuous rotation - not standard servos
+8,motion,SG90 standard micro servo (head pan),1,2.50,2.50,no,180 degree
+9,motion,6 mm x 60 mm steel rod or M6 bolt,2,1.00,2.00,no,Wheel axles
+10,power,18650 Li-ion cell (protected),2,6.00,12.00,no,2S = 7.4 V nominal; skip for USB-only builds
+11,power,2S 18650 battery holder,1,2.50,2.50,no,
+12,power,MP1584EN or LM2596 buck converter,1,2.00,2.00,no,Set to 5.0 V before connecting anything
+13,power,2S BMS / balance charge board,1,3.00,3.00,no,Do not skip on lithium
+14,power,100k ohm resistor (battery divider),2,0.10,0.20,no,2:1 divider into PIN_BATTERY_ADC
+15,passives,470 uF 10 V electrolytic capacitor,1,0.30,0.30,yes,Across the servo 5 V rail; fixes random reboots
+16,passives,100 nF ceramic capacitor,2,0.10,0.20,yes,Decoupling at the mic and amp
+17,passives,Dupont jumper wires 20 cm F-F,40,0.05,2.00,yes,
+18,passives,22 AWG silicone hookup wire (3 colours),1,4.00,4.00,yes,
+19,passives,Heat-shrink assortment,1,2.00,2.00,yes,
+20,hardware,M3 x 10 mm screw + nut,12,0.05,0.60,no,
+21,hardware,M2 x 6 mm self-tapping screw,16,0.03,0.48,no,
+22,hardware,M2.5 x 6 mm self-tapping screw,4,0.03,0.12,no,
+23,hardware,SPST slide switch,1,0.50,0.50,no,Main power
+24,filament,PLA filament (grams),180,0.02,3.60,no,Body head and most parts
+25,filament,PETG filament (grams),40,0.025,1.00,no,Drive wheels and neck bracket
+26,filament,TPU 95A filament (grams),25,0.04,1.00,no,Two track belts

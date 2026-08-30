@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 760" width="1040" height="760" font-family="Menlo, Consolas, monospace">
+  <title>Wall-E desk robot wiring diagram</title>
+  <desc>ESP32-S3 connected to an INMP441 microphone, MAX98357A amplifier and speaker, SSD1306 OLED, OV2640 camera, three servos and a 5 V power supply.</desc>
+
+  <!-- White ground so the diagram is readable in both GitHub themes -->
+  <rect width="1040" height="760" fill="#ffffff"/>
+
+  <style>
+    .box   { fill:#f4f6f8; stroke:#334155; stroke-width:2; rx:8; }
+    .mcu   { fill:#e8effa; stroke:#1e3a8a; stroke-width:2.5; rx:10; }
+    .pwr   { fill:#fff4e6; stroke:#b45309; stroke-width:2; rx:8; }
+    .title { font-size:15px; font-weight:bold; fill:#0f172a; }
+    .sub   { font-size:11px; fill:#475569; }
+    .pin   { font-size:11px; fill:#0f172a; }
+    .sig   { stroke:#2563eb; stroke-width:1.8; fill:none; }
+    .v33   { stroke:#dc2626; stroke-width:1.8; fill:none; }
+    .v5    { stroke:#b45309; stroke-width:2.2; fill:none; }
+    .gnd   { stroke:#334155; stroke-width:1.8; fill:none; }
+    .note  { font-size:11px; fill:#64748b; }
+    .hdr   { font-size:19px; font-weight:bold; fill:#0f172a; }
+  </style>
+
+  <text x="24" y="34" class="hdr">Wall-E — wiring</text>
+  <text x="24" y="54" class="note">Pin numbers are GPIO numbers and match firmware/include/config.h. Camera pins are fixed by the board and are not shown individually.</text>
+
+  <!-- ============================ MCU ============================ -->
+  <rect x="380" y="230" width="280" height="300" class="mcu"/>
+  <text x="520" y="258" class="title" text-anchor="middle">ESP32-S3-WROOM</text>
+  <text x="520" y="276" class="sub" text-anchor="middle">Freenove CAM board</text>
+  <text x="520" y="292" class="sub" text-anchor="middle">8 MB flash · 8 MB PSRAM</text>
+  <text x="520" y="316" class="sub" text-anchor="middle">OV2640 camera on-board</text>
+
+  <!-- left pin labels -->
+  <text x="392" y="348" class="pin">39 SCK</text>
+  <text x="392" y="366" class="pin">38 WS</text>
+  <text x="392" y="384" class="pin">40 SD</text>
+  <text x="392" y="416" class="pin">41 BCLK</text>
+  <text x="392" y="434" class="pin">42 LRC</text>
+  <text x="392" y="452" class="pin">21 DIN</text>
+  <text x="392" y="500" class="pin">1  BATT</text>
+
+  <!-- right pin labels -->
+  <text x="648" y="348" class="pin" text-anchor="end">SDA 47</text>
+  <text x="648" y="366" class="pin" text-anchor="end">SCL 48</text>
+  <text x="648" y="416" class="pin" text-anchor="end">SIG  2</text>
+  <text x="648" y="434" class="pin" text-anchor="end">SIG  3</text>
+  <text x="648" y="452" class="pin" text-anchor="end">SIG 14</text>
+  <text x="648" y="500" class="pin" text-anchor="end">BOOT 0</text>
+
+  <!-- ====================== microphone ====================== -->
+  <rect x="70" y="300" width="200" height="100" class="box"/>
+  <text x="170" y="326" class="title" text-anchor="middle">INMP441</text>
+  <text x="170" y="344" class="sub" text-anchor="middle">I2S MEMS microphone</text>
+  <text x="170" y="362" class="sub" text-anchor="middle">L/R → GND (left channel)</text>
+  <text x="170" y="384" class="sub" text-anchor="middle">VDD → 3V3 · GND → GND</text>
+
+  <path class="sig" d="M270 345 H 388"/>
+  <path class="sig" d="M270 363 H 388"/>
+  <path class="sig" d="M270 381 H 388"/>
+  <text x="300" y="340" class="note">SCK</text>
+  <text x="300" y="358" class="note">WS</text>
+  <text x="300" y="376" class="note">SD</text>
+
+  <!-- ====================== amplifier ====================== -->
+  <rect x="70" y="440" width="200" height="120" class="box"/>
+  <text x="170" y="466" class="title" text-anchor="middle">MAX98357A</text>
+  <text x="170" y="484" class="sub" text-anchor="middle">I2S amp + DAC, 3 W</text>
+  <text x="170" y="502" class="sub" text-anchor="middle">VIN → 5V · GND → GND</text>
+  <text x="170" y="520" class="sub" text-anchor="middle">GAIN floating = 9 dB</text>
+  <text x="170" y="544" class="sub" text-anchor="middle">SD pin: leave unconnected</text>
+
+  <path class="sig" d="M270 452 H 330 V 413 H 388"/>
+  <path class="sig" d="M270 470 H 320 V 431 H 388"/>
+  <path class="sig" d="M270 488 H 310 V 449 H 388"/>
+  <text x="286" y="447" class="note">BCLK</text>
+  <text x="286" y="465" class="note">LRC</text>
+  <text x="286" y="483" class="note">DIN</text>
+
+  <!-- speaker -->
+  <rect x="70" y="600" width="200" height="70" class="box"/>
+  <text x="170" y="626" class="title" text-anchor="middle">Speaker</text>
+  <text x="170" y="646" class="sub" text-anchor="middle">4 Ω · 3 W · 40 mm</text>
+  <text x="170" y="662" class="sub" text-anchor="middle">no polarity, no series cap</text>
+  <path class="sig" d="M140 560 V 600"/>
+  <path class="sig" d="M200 560 V 600"/>
+
+  <!-- ====================== OLED ====================== -->
+  <rect x="770" y="300" width="200" height="100" class="box"/>
+  <text x="870" y="326" class="title" text-anchor="middle">SSD1306 OLED</text>
+  <text x="870" y="344" class="sub" text-anchor="middle">128×64 I2C, addr 0x3C</text>
+  <text x="870" y="366" class="sub" text-anchor="middle">VCC → 3V3 · GND → GND</text>
+  <text x="870" y="386" class="sub" text-anchor="middle">its own bus, not the camera's</text>
+
+  <path class="sig" d="M660 345 H 768"/>
+  <path class="sig" d="M660 363 H 768"/>
+  <text x="690" y="340" class="note">SDA</text>
+  <text x="690" y="358" class="note">SCL</text>
+
+  <!-- ====================== servos ====================== -->
+  <rect x="770" y="440" width="200" height="130" class="box"/>
+  <text x="870" y="466" class="title" text-anchor="middle">Servos</text>
+  <text x="870" y="486" class="sub" text-anchor="middle">FS90R left track → GPIO 2</text>
+  <text x="870" y="504" class="sub" text-anchor="middle">FS90R right track → GPIO 3</text>
+  <text x="870" y="522" class="sub" text-anchor="middle">SG90 head pan → GPIO 14</text>
+  <text x="870" y="546" class="sub" text-anchor="middle">red → 5V rail (not the ESP32)</text>
+  <text x="870" y="562" class="sub" text-anchor="middle">brown → common GND</text>
+
+  <path class="sig" d="M660 413 H 720 V 470 H 768"/>
+  <path class="sig" d="M660 431 H 710 V 488 H 768"/>
+  <path class="sig" d="M660 449 H 700 V 506 H 768"/>
+
+  <!-- ====================== button ====================== -->
+  <rect x="770" y="610" width="200" height="60" class="box"/>
+  <text x="870" y="634" class="title" text-anchor="middle">BOOT button</text>
+  <text x="870" y="654" class="sub" text-anchor="middle">on-board · tap = talk · 3 s = reboot</text>
+  <path class="sig" d="M660 497 H 740 V 640 H 768"/>
+
+  <!-- ====================== power ====================== -->
+  <rect x="330" y="600" width="380" height="130" class="pwr"/>
+  <text x="520" y="626" class="title" text-anchor="middle">Power</text>
+  <text x="520" y="646" class="sub" text-anchor="middle">2S 18650 (7.4 V) → BMS → buck converter → 5.0 V rail</text>
+  <text x="520" y="664" class="sub" text-anchor="middle">5 V rail feeds: ESP32 5V pin · MAX98357A VIN · all three servos</text>
+  <text x="520" y="682" class="sub" text-anchor="middle">470 µF across the 5 V rail, right at the servos</text>
+  <text x="520" y="702" class="sub" text-anchor="middle">battery + → 100 kΩ → GPIO 1 → 100 kΩ → GND  (2:1 divider)</text>
+  <text x="520" y="722" class="sub" text-anchor="middle">ONE common ground for everything. This is not optional.</text>
+
+  <path class="v5" d="M520 530 V 598"/>
+  <text x="530" y="560" class="note" fill="#b45309">5 V</text>
+  <path class="v5" d="M330 640 H 280 V 452"/>
+  <path class="v5" d="M710 640 H 750 V 470"/>
+  <path class="v33" d="M420 530 V 570 H 240 V 400"/>
+  <text x="300" y="566" class="note" fill="#dc2626">3V3 → mic, OLED</text>
+  <path class="v33" d="M240 570 H 880 V 400" opacity="0.55"/>
+
+  <!-- legend -->
+  <rect x="24" y="80" width="360" height="120" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" rx="6"/>
+  <text x="40" y="102" class="title">Legend</text>
+  <path class="sig" d="M40 120 H 80"/><text x="90" y="124" class="note">signal (3.3 V logic)</text>
+  <path class="v33" d="M40 142 H 80"/><text x="90" y="146" class="note">3.3 V power</text>
+  <path class="v5"  d="M40 164 H 80"/><text x="90" y="168" class="note">5 V power</text>
+  <path class="gnd" d="M40 186 H 80"/><text x="90" y="190" class="note">ground (one common node)</text>
+
+  <!-- warnings -->
+  <rect x="640" y="80" width="376" height="120" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5" rx="6"/>
+  <text x="656" y="102" class="title">Three ways to break this</text>
+  <text x="656" y="124" class="note">1. Powering servos from the ESP32's 3V3 pin.</text>
+  <text x="656" y="142" class="note">2. Forgetting the 470 µF cap → random reboots.</text>
+  <text x="656" y="160" class="note">3. Separate grounds → I2S noise or nothing at all.</text>
+  <text x="656" y="184" class="note">The camera shares GPIO 4–18. Do not reuse them.</text>
+</svg>

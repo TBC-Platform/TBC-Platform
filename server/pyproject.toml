@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: MIT
+[project]
+name = "walle-server"
+version = "1.0.0"
+description = "Off-device brain for the ESP32 Wall-E desk robot: STT, LLM, TTS, vision and smart home"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.30,<1.0",
+    "httpx>=0.27,<1.0",
+    "websockets>=12.0",
+]
+
+[project.optional-dependencies]
+vision = ["tflite-runtime>=2.14", "Pillow>=10.0", "numpy>=1.24"]
+fasterwhisper = ["faster-whisper>=1.0"]
+mqtt = ["aiomqtt>=2.0"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.6"]
+
+[project.scripts]
+walle-server = "walle.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["walle*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = ["error::DeprecationWarning:walle.*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = [
+    "E501",   # long lines are handled by the formatter
+    "B008",   # FastAPI's Query()/Depends() in defaults is the documented style
+]

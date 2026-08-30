@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+# 8 MB flash layout for Wall-E (total must add up to exactly 0x800000).
+#
+# Two 2 MB app slots are required for OTA: the new image is written to the
+# inactive slot and only swapped in once it verifies, so a failed update can
+# never brick the robot.
+#
+# The `model` partition holds the ESP-SR wake-word models. Without it,
+# wakeword::begin() returns false and the firmware falls back to push-to-talk.
+#
+# Name,     Type, SubType,  Offset,   Size,     Flags
+nvs,        data, nvs,      0x9000,   0x5000,
+otadata,    data, ota,      0xe000,   0x2000,
+app0,       app,  ota_0,    0x10000,  0x200000,
+app1,       app,  ota_1,    0x210000, 0x200000,
+model,      data, spiffs,   0x410000, 0x200000,
+storage,    data, littlefs, 0x610000, 0x1F0000,
