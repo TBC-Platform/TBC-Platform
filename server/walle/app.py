@@ -185,6 +185,13 @@ def create_app(config: Config | None = None) -> FastAPI:
             send_text=websocket.send_text,
             send_bytes=websocket.send_bytes,
         )
+        # A robot that dropped off without a clean close can reconnect while
+        # its old handler is still winding down. Close the stale session before
+        # replacing it, so its in-flight turn does not keep talking.
+        previous = app.state.sessions.get(device_id)
+        if previous is not None and previous is not session:
+            log.info("[%s] replacing an existing session", device_id)
+            await previous.close()
         app.state.sessions[device_id] = session
         log.info("[%s] websocket open from %s", device_id,
                  websocket.client.host if websocket.client else "?")
@@ -207,7 +214,12 @@ def create_app(config: Config | None = None) -> FastAPI:
             log.exception("[%s] websocket error", device_id)
         finally:
             await session.close()
-            app.state.sessions.pop(device_id, None)
+            # Only remove the mapping if it still points at *this* handler's
+            # session. An unconditional pop would delete a newer session that
+            # reconnected under the same device id, leaving the live robot
+            # missing from /health and unclosed at shutdown.
+            if app.state.sessions.get(device_id) is session:
+                app.state.sessions.pop(device_id, None)
             log.info("[%s] websocket closed", device_id)
 
     return app

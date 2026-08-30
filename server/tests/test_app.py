@@ -91,6 +91,23 @@ def test_history_endpoint(client):
     assert body == {"device": "walle-test", "turns": []}
 
 
+def test_reconnecting_under_the_same_device_id_keeps_the_live_session(client):
+    """The stale handler's cleanup must not evict the session that replaced it."""
+    headers = {"X-Walle-Token": TOKEN, "X-Walle-Device": "walle-dup"}
+    with client.websocket_connect("/ws", headers=headers) as first:
+        first.send_text(proto.encode_json(proto.MSG_HELLO, proto=proto.PROTO_VERSION))
+        proto.decode_json(first.receive_text())
+        assert "walle-dup" in client.get("/health").json()["devices_online"]
+
+        with client.websocket_connect("/ws", headers=headers) as second:
+            second.send_text(proto.encode_json(proto.MSG_HELLO, proto=proto.PROTO_VERSION))
+            proto.decode_json(second.receive_text())
+            assert "walle-dup" in client.get("/health").json()["devices_online"]
+
+    # Both closed now, so it should be gone - but never while one was live.
+    assert "walle-dup" not in client.get("/health").json()["devices_online"]
+
+
 def test_malformed_control_frame_does_not_kill_the_socket(client):
     headers = {"X-Walle-Token": TOKEN, "X-Walle-Device": "walle-test"}
     with client.websocket_connect("/ws", headers=headers) as ws:

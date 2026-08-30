@@ -94,6 +94,14 @@ flags, sequence, length). Audio is 16 kHz mono S16LE **in both directions**, so
 the ESP32 never resamples — Piper's 22.05 kHz output is downsampled on the
 server, where CPU is free.
 
+Downstream speech is **paced**, not blasted. The device's ring buffer holds
+about four seconds; a fast LAN would otherwise hand it a twenty second reply
+almost instantly, and the firmware would drop everything that did not fit —
+silently truncating the end of the sentence. So the server runs at most
+`PLAYBACK_LEAD_S` (2 s) of audio ahead of real time. That is still far enough
+ahead to ride out a Wi-Fi retry, and it means a barge-in throws away two
+seconds of speech rather than twenty.
+
 The constants live in two places by necessity —
 [`firmware/src/core/protocol.h`](../firmware/src/core/protocol.h) and
 [`server/walle/protocol.py`](../server/walle/protocol.py). `test_protocol.py`
@@ -115,7 +123,10 @@ BOOT → CONNECTING → IDLE ⇄ LISTENING → THINKING → SPEAKING
   backstop for a server that vanished mid-turn, not the normal exit.
 - **SPEAKING** — wake word muted (otherwise the robot hears itself say its own
   name and wakes up in a loop), buffer draining, mouth animating to the audio
-  envelope.
+  envelope. Pressing the button here is a barge-in: it flushes the local buffer
+  *and* starts a new utterance, because `utt_begin` is what cancels the
+  server's speaking task. Flushing alone would just let the rest of the reply
+  arrive and play again.
 
 The microphone paces the whole loop: `audio_in::readFrame()` blocks until I2S
 has exactly 20 ms of audio, which gives a steady 50 Hz main loop with no

@@ -91,7 +91,7 @@ line rather than crashing.
 
 ```bash
 pip install -r requirements-dev.txt
-python3 -m pytest -q          # 142 tests, no hardware, no network
+python3 -m pytest -q          # 148 tests, no hardware, no network
 python3 -m ruff check .
 ```
 

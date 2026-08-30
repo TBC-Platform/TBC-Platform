@@ -16,13 +16,21 @@ bool gReady = false;
 // 4 seconds of 16 kHz mono in PSRAM. Wi-Fi delivers TTS in bursts; this
 // absorbs them so the speaker never stutters mid-sentence.
 constexpr size_t kRingSamples = WALLE_AUDIO_SAMPLE_RATE * 4;
+// Half a second, for boards without usable PSRAM.
+constexpr size_t kRingSamplesFallback = WALLE_AUDIO_SAMPLE_RATE / 2;
+
 int16_t *gRing = nullptr;
+// The capacity actually allocated. Every ring operation must use this rather
+// than kRingSamples: on the fallback path they differ by 8x, and wrapping at
+// the wrong modulus writes straight past the end of the allocation.
+size_t gRingCapacity = 0;
 volatile size_t gRingHead = 0;  // write
 volatile size_t gRingTail = 0;  // read
 uint8_t gLevel = 0;
 
 inline size_t ringUsed() {
-  return (gRingHead + kRingSamples - gRingTail) % kRingSamples;
+  if (!gRingCapacity) return 0;
+  return (gRingHead + gRingCapacity - gRingTail) % gRingCapacity;
 }
 
 }  // namespace
@@ -32,12 +40,18 @@ namespace audio_out {
 bool begin() {
   gRing = (int16_t *)heap_caps_malloc(kRingSamples * sizeof(int16_t),
                                       MALLOC_CAP_SPIRAM);
+  gRingCapacity = kRingSamples;
   if (!gRing) {
     // No PSRAM? Fall back to a much smaller internal-RAM buffer. Playback
     // still works, it is just less tolerant of Wi-Fi hiccups.
-    gRing = (int16_t *)heap_caps_malloc(WALLE_AUDIO_SAMPLE_RATE / 2 * sizeof(int16_t),
+    gRing = (int16_t *)heap_caps_malloc(kRingSamplesFallback * sizeof(int16_t),
                                         MALLOC_CAP_INTERNAL);
-    if (!gRing) return false;
+    gRingCapacity = kRingSamplesFallback;
+    if (!gRing) {
+      gRingCapacity = 0;
+      return false;
+    }
+    Serial.println("[audio] no PSRAM: playback buffer is 0.5 s, not 4 s");
   }
 
   i2s_chan_config_t chanCfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_1, I2S_ROLE_MASTER);
@@ -68,7 +82,7 @@ bool begin() {
 
 size_t freeSpace() {
   if (!gReady) return 0;
-  return kRingSamples - ringUsed() - 1;  // -1 keeps head != tail when full
+  return gRingCapacity - ringUsed() - 1;  // -1 keeps head != tail when full
 }
 
 size_t write(const int16_t *samples, size_t count) {
@@ -77,7 +91,7 @@ size_t write(const int16_t *samples, size_t count) {
   if (count > room) count = room;
   for (size_t i = 0; i < count; i++) {
     gRing[gRingHead] = samples[i];
-    gRingHead = (gRingHead + 1) % kRingSamples;
+    gRingHead = (gRingHead + 1) % gRingCapacity;
   }
   return count;
 }
@@ -113,7 +127,7 @@ void tick() {
   uint32_t peak = 0;
   for (size_t i = 0; i < n; i++) {
     const int16_t s = gRing[gRingTail];
-    gRingTail = (gRingTail + 1) % kRingSamples;
+    gRingTail = (gRingTail + 1) % gRingCapacity;
     frame[i] = s;
     const uint32_t a = (uint32_t)abs((int)s);
     if (a > peak) peak = a;
@@ -126,7 +140,7 @@ void tick() {
   if (written < n * sizeof(int16_t)) {
     // Rewind the samples I2S refused so nothing is lost.
     const size_t unwritten = n - written / sizeof(int16_t);
-    gRingTail = (gRingTail + kRingSamples - unwritten) % kRingSamples;
+    gRingTail = (gRingTail + gRingCapacity - unwritten) % gRingCapacity;
   }
 
   // Smooth the envelope a little; raw peak makes the mouth flicker.

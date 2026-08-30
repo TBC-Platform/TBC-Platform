@@ -51,6 +51,14 @@ MAX_JPEG_BYTES = 512 * 1024
 
 CAMERA_TIMEOUT_S = 4.0
 
+# The device holds about 4 seconds of playback buffer. Streaming faster than
+# real time is what keeps speech gapless, but streaming *unboundedly* faster
+# fills that buffer and the firmware then drops whatever will not fit - which
+# truncates any reply longer than the buffer. So run ahead by at most this
+# much audio and no more. Two seconds is half the device's ring: enough slack
+# to ride out a Wi-Fi retry, small enough that a barge-in discards little.
+PLAYBACK_LEAD_S = 2.0
+
 
 @dataclass
 class Brain:
@@ -104,6 +112,11 @@ class Session:
         self._utt_started = 0.0
         self._seq = 0
         self._overflowed = False
+
+        # Downlink pacing, see PLAYBACK_LEAD_S. Spans a whole reply, not one
+        # sentence, so multi-sentence answers stay bounded too.
+        self._stream_started = 0.0
+        self._streamed_samples = 0
 
         # Camera frame assembly.
         self._jpeg_parts: list[bytes] = []
@@ -309,7 +322,7 @@ class Session:
 
         # --- 4. speak -------------------------------------------------------
         if reply.text:
-            timings.tts_first = await self._say(reply.text)
+            timings.tts_first = await self._say(reply.text, end_face=reply.end_face or "idle")
 
         timings.total = int((time.monotonic() - started) * 1000) + timings.capture
         log.info("[%s] turn done: %s", self.device_id, timings.render())
@@ -354,7 +367,11 @@ class Session:
             return Reply(text=detected.speech, face=detected.face)
 
         if kind == "sleep":
-            return Reply(text=detected.speech, face="sleep")
+            # Stop moving and stay on the sleep face after the farewell. The
+            # wake word deliberately keeps running - a robot you cannot wake up
+            # is not asleep, it is off.
+            await self.send(proto.MSG_MOVE, cmd="stop")
+            return Reply(text=detected.speech, face="sleep", end_face="sleep")
 
         if kind == "status":
             return Reply(text=self._status_sentence(), face="idle")
@@ -524,13 +541,15 @@ class Session:
     # Speech output
     # ------------------------------------------------------------------
 
-    async def _say(self, text: str) -> int:
+    async def _say(self, text: str, end_face: str = "idle") -> int:
         """Renders and streams speech. Returns time-to-first-audio in ms.
 
         Sentence by sentence: the robot starts talking as soon as the first
         sentence is rendered rather than waiting for the whole paragraph.
         """
         started = time.monotonic()
+        self._stream_started = started
+        self._streamed_samples = 0
         await self.send(proto.MSG_SAY_BEGIN, text=text[:200])
         await self.set_face("speaking")
 
@@ -561,15 +580,20 @@ class Session:
 
         await self._send_audio_chunk(b"", flags=proto.FLAG_LAST)
         await self.send(proto.MSG_SAY_END)
-        await self.set_face("idle")
+        await self.set_face(end_face)
         return first_audio_ms
 
     async def _stream_pcm(self, samples: PcmArray) -> None:
-        """Sends PCM as protocol frames, paced so the device buffer survives.
+        """Sends PCM as protocol frames, paced to the device's playback rate.
 
-        The robot has ~4 seconds of buffer, so we can push well ahead of
-        real time - but not infinitely. Yielding every 10 frames (200 ms of
-        audio) keeps the event loop responsive without throttling the stream.
+        Pacing is not politeness, it is correctness: the firmware's ring buffer
+        holds ~4 seconds, and a fast LAN will happily hand it a 20 second reply
+        in a fraction of that, at which point `audio_out::write()` drops the
+        overflow and the end of the sentence is simply lost. So we keep at most
+        PLAYBACK_LEAD_S of audio ahead of real time and sleep off the rest.
+
+        Sleeping here also makes barge-in cheaper: less audio is in flight, so
+        less has to be thrown away.
         """
         if not samples:
             return
@@ -577,7 +601,15 @@ class Session:
         for index, chunk in enumerate(proto.chunk_audio(raw)):
             flags = proto.FLAG_FIRST if index == 0 else proto.FLAG_NONE
             await self._send_audio_chunk(chunk, flags=flags)
-            if index % 10 == 9:
+
+            self._streamed_samples += len(chunk) // 2
+            audio_sent_s = self._streamed_samples / proto.AUDIO_SAMPLE_RATE
+            elapsed_s = time.monotonic() - self._stream_started
+            lead_s = audio_sent_s - elapsed_s
+            if lead_s > PLAYBACK_LEAD_S:
+                await asyncio.sleep(lead_s - PLAYBACK_LEAD_S)
+            elif index % 10 == 9:
+                # Still let the event loop breathe while we are behind.
                 await asyncio.sleep(0)
 
     # ------------------------------------------------------------------

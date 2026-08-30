@@ -284,10 +284,18 @@ void serviceButton() {
       if (gState == ST_IDLE) {
         beginUtterance("button");
       } else if (gState == ST_SPEAKING) {
-        // Barge-in: shut up and listen.
+        // Barge-in. Dropping the local buffer is not enough on its own: the
+        // server keeps streaming the rest of the reply, which would simply be
+        // buffered and played again. Starting a new utterance is what sends
+        // utt_begin, and utt_begin is what cancels the server's speaking task.
         audio_out::flush();
         gServerSaidDone = true;
-        setState(ST_IDLE);
+        wakeword::setMuted(false);
+        gUnmuteAt = 0;
+        // The pre-roll is full of Wall-E's own voice coming back through the
+        // mic; sending it would give the recogniser the robot's words.
+        audio_in::clearPreroll();
+        beginUtterance("barge-in");
       }
     }
   }

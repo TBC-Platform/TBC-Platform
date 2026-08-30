@@ -264,6 +264,78 @@ async def test_camera_overrun_is_dropped(session, caplog):
 
 
 # ---------------------------------------------------------------------------
+# Sleep intent
+# ---------------------------------------------------------------------------
+
+async def test_sleep_leaves_the_sleep_face_on_screen(session, wire):
+    """The speaking face overwrites it mid-reply, so the LAST face must be sleep."""
+    await speak_to(session, "goodnight")
+    faces = [m["e"] for m in wire.control if m["t"] == proto.MSG_FACE]
+    assert faces[-1] == "sleep", faces
+    assert "speaking" in faces  # it really did go through the speech path
+
+
+async def test_sleep_stops_the_motors(session, wire):
+    await speak_to(session, "goodnight")
+    assert wire.first(proto.MSG_MOVE)["cmd"] == "stop"
+
+
+async def test_a_normal_reply_still_ends_on_idle(session, wire):
+    await speak_to(session, "what is the capital of france")
+    faces = [m["e"] for m in wire.control if m["t"] == proto.MSG_FACE]
+    assert faces[-1] == "idle", faces
+
+
+# ---------------------------------------------------------------------------
+# Downlink pacing
+# ---------------------------------------------------------------------------
+
+async def test_long_replies_are_paced_to_the_device_buffer(brain, wire, monkeypatch):
+    """Unpaced streaming overflows the firmware's ring and truncates the reply.
+
+    Two seconds of audio must not be handed over in one burst. The lead is
+    shrunk to 0.2 s so the assertion is decisive without making the test itself
+    wait out a realistic buffer.
+    """
+    import time as _time
+    from array import array as _array
+
+    from walle.tts.base import Speech
+
+    monkeypatch.setattr("walle.session.PLAYBACK_LEAD_S", 0.2)
+
+    class LongTts:
+        name = "long-tts"
+
+        async def synthesize(self, text):
+            # 2 seconds of silence at the protocol rate.
+            return Speech(samples=_array("h", bytes(proto.AUDIO_SAMPLE_RATE * 2 * 2)),
+                          sample_rate=proto.AUDIO_SAMPLE_RATE)
+
+    brain.tts = LongTts()
+    session = Session(brain, "walle-test", wire.send_text, wire.send_bytes)
+
+    started = _time.monotonic()
+    await speak_to(session, "tell me something long")
+    elapsed = _time.monotonic() - started
+
+    # 2 s of audio with a 0.2 s lead cannot legitimately finish instantly.
+    assert elapsed > 0.5, f"streamed 2s of audio in {elapsed:.2f}s - not paced"
+    # And it must all still arrive - pacing must not drop anything.
+    total = sum(len(chunk) for chunk in wire.audio) // 2
+    assert total == proto.AUDIO_SAMPLE_RATE * 2
+
+
+async def test_short_replies_are_not_delayed(session, wire):
+    """Pacing must not slow down the common case."""
+    import time as _time
+
+    started = _time.monotonic()
+    await speak_to(session, "what is the capital of france")
+    assert _time.monotonic() - started < 0.5
+
+
+# ---------------------------------------------------------------------------
 # Capture edge cases
 # ---------------------------------------------------------------------------
 

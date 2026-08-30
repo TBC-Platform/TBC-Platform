@@ -24,8 +24,12 @@ class Reply:
     """What the robot should do in response to one user turn."""
 
     text: str                      # spoken out loud
-    face: str | None = None        # one of protocol.FACES
+    face: str | None = None        # one of protocol.FACES, shown while replying
     move: str | None = None        # one of protocol.MOVES
+    # Face to leave on screen once the reply has finished. Defaults to "idle";
+    # "sleep" is what makes the sleep intent actually stick, since the speaking
+    # face would otherwise overwrite it and idle would follow.
+    end_face: str | None = None
     latency_ms: int = 0
     meta: dict = field(default_factory=dict)
 

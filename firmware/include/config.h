@@ -20,11 +20,26 @@
 // ------------------------------- features ---------------------------------
 // Turn a subsystem off and its code drops out of the build. Useful for
 // bring-up: get Wi-Fi + audio working before you solder the camera on.
+//
+// Every one is #ifndef-guarded so a PlatformIO env can override it with a -D
+// flag. Without the guard these unconditional defines win over the command
+// line, and the `walle-minimal` bring-up build would still compile in the
+// camera and motors it promises to leave out.
+#ifndef WALLE_ENABLE_CAMERA
 #define WALLE_ENABLE_CAMERA 1
+#endif
+#ifndef WALLE_ENABLE_DISPLAY
 #define WALLE_ENABLE_DISPLAY 1
+#endif
+#ifndef WALLE_ENABLE_MOTORS
 #define WALLE_ENABLE_MOTORS 1
+#endif
+#ifndef WALLE_ENABLE_OTA
 #define WALLE_ENABLE_OTA 1
+#endif
+#ifndef WALLE_ENABLE_BATTERY
 #define WALLE_ENABLE_BATTERY 1
+#endif
 
 // Wake-word backend:
 //   0 = push-to-talk only (BOOT button). Always compiles, zero dependencies.
